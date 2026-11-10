@@ -832,7 +832,9 @@ function handle(entry, ev) {
     }
     case "answer": {
       finish(entry);
-      entry.answer.innerHTML = markdown(ev.text || "");
+      entry.answer.innerHTML = (ev.text || "").trim()
+        ? markdown(ev.text)
+        : `<div class="error-box">El agente no devolvió texto. Vuelve a enviar la pregunta.</div>`;
       if (!reduceMotion) revealWords(entry.answer);
       const st = ev.stats;
       entry.stats.hidden = false;

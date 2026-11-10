@@ -76,6 +76,34 @@ def test_guardrail_blocks_writes(db):
     assert db.run("SELECT COUNT(*) AS n FROM customers").df["n"][0] > 0
 
 
+def test_empty_or_truncated_turns_are_retried(db):
+    client = FakeClient(
+        [
+            # reasoning used up the budget: no text, no tool call
+            NS(content=[NS(type="thinking", thinking="...", signature="x")], stop_reason="end_turn",
+               usage=NS(input_tokens=10, output_tokens=5, cache_read_input_tokens=0)),
+            # cut off in the middle of a tool call
+            resp(tool("t1", "run_sql", sql="SELECT mon"), stop="max_tokens"),
+            resp(text("El churn de octubre fue **3.2%**."), stop="end_turn"),
+        ]
+    )
+    agent = AnalyticsAgent(db=db, client=client, model="test")
+    events = list(agent.ask("¿Cómo va el churn?"))
+    assert [e.kind for e in events] == ["answer"]
+    assert "3.2%" in events[0].data["text"]
+    assert len(client.calls) == 3
+    # the discarded turns never enter the conversation history
+    assert [m["role"] for m in agent.messages] == ["user", "assistant"]
+
+
+def test_never_returns_an_empty_answer(db):
+    empty = NS(content=[], stop_reason="end_turn", usage=NS(input_tokens=1, output_tokens=1, cache_read_input_tokens=0))
+    client = FakeClient([empty, empty, empty])
+    agent = AnalyticsAgent(db=db, client=client, model="test")
+    events = list(agent.ask("hola"))
+    assert events[-1].kind == "answer" and events[-1].data["text"].strip()
+
+
 def test_follow_up_keeps_history(db):
     client = FakeClient(
         [

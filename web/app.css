@@ -551,6 +551,7 @@ table.data tr:last-child td { border-bottom: 0; }
   padding-bottom: 1px;
 }
 .answer li > ul, .answer li > ol { margin: 6px 0 4px; }
+.answer em .num { font-family: inherit; font-size: inherit; font-weight: inherit; letter-spacing: 0; }
 .answer td .num, .answer th .num { background-image: none; }
 .answer .w {
   display: inline;

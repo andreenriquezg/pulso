@@ -20,7 +20,9 @@ métricas desde las tablas raw: así todos los equipos ven el mismo número.
 3. Nunca promedies tasas entre países, canales o meses. Suma los componentes y recalcula \
 (por ejemplo churn = SUM(churned_customers) / SUM(customers_start)).
 4. Si una consulta falla, lee el error, corrígela y vuelve a intentar. No inventes cifras: \
-todo número de tu respuesta debe salir de una consulta que ejecutaste.
+todo número de tu respuesta debe salir de una consulta que ejecutaste. Tampoco hagas \
+aritmética a mano: si das un total, una suma de países, una diferencia o un porcentaje de \
+cambio, calcúlalo en el SQL para que quede auditable.
 5. Cuando haya una tendencia en el tiempo o una comparación entre segmentos, crea una \
 gráfica con `make_chart` usando el query_id del resultado. Una gráfica por respuesta suele bastar.
 6. Haz las consultas que hagan falta (normalmente 1 a 3), y si ves algo raro (un pico, una \

@@ -16,6 +16,10 @@ from .prompts import TOOLS, build_system_prompt
 
 DEFAULT_MODEL = os.getenv("PULSO_MODEL", "claude-sonnet-5-5")
 MAX_STEPS = 8
+# The model reasons before answering and that reasoning counts toward max_tokens,
+# so leave plenty of room; a turn cut short is retried instead of shown.
+MAX_TOKENS = 8192
+MAX_RETRIES = 2
 
 
 # ----------------------------------------------------------------------------
@@ -47,6 +51,10 @@ def _block_to_dict(block: Any) -> dict:
         return {"type": "text", "text": block.text}
     if block.type == "tool_use":
         return {"type": "tool_use", "id": block.id, "name": block.name, "input": block.input}
+    if block.type == "thinking":  # must be sent back unchanged, signature included
+        return {"type": "thinking", "thinking": block.thinking, "signature": block.signature}
+    if block.type == "redacted_thinking":
+        return {"type": "redacted_thinking", "data": block.data}
     raise ValueError(f"Bloque desconocido: {block.type}")
 
 
@@ -119,11 +127,13 @@ class AnalyticsAgent:
         t0 = time.perf_counter()
         self.messages.append({"role": "user", "content": question})
 
-        for _ in range(MAX_STEPS):
-            stats.steps += 1
+        retries = 0
+        for _ in range(MAX_STEPS + MAX_RETRIES):
+            if stats.steps >= MAX_STEPS:
+                break
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=2048,
+                max_tokens=MAX_TOKENS,
                 system=self.system,
                 tools=TOOLS,
                 messages=list(self.messages),
@@ -135,10 +145,24 @@ class AnalyticsAgent:
                 stats.cache_read_tokens += getattr(usage, "cache_read_input_tokens", 0) or 0
 
             content = [_block_to_dict(b) for b in response.content]
+            has_text = any(b["type"] == "text" and b["text"].strip() for b in content)
+            has_tool = any(b["type"] == "tool_use" for b in content)
+            # A turn that was cut off (max_tokens) or produced only internal reasoning is
+            # unusable: a truncated tool call has incomplete input and an empty answer
+            # tells the user nothing. Drop it from the history and ask again.
+            cut_off = response.stop_reason == "max_tokens"
+            empty = response.stop_reason != "tool_use" and not has_text
+            if (cut_off or empty or (response.stop_reason == "tool_use" and not has_tool)) and retries < MAX_RETRIES:
+                retries += 1
+                continue
+            stats.steps += 1
             self.messages.append({"role": "assistant", "content": content})
 
             if response.stop_reason != "tool_use":
                 text = "\n".join(b["text"] for b in content if b["type"] == "text").strip()
+                if not text:
+                    text = ("No logré redactar una respuesta para esta pregunta. Intenta reformularla "
+                            "o hacerla más específica (por ejemplo, un periodo o un país).")
                 stats.seconds = time.perf_counter() - t0
                 self.last_stats = stats
                 yield Event("answer", {"text": text, "stats": stats})
