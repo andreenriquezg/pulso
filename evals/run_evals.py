@@ -82,7 +82,7 @@ def evaluate(case: dict, db: Database, agent: AnalyticsAgent) -> dict:
 
 
 def main() -> None:
-    cases = yaml.safe_load((ROOT / "evals" / "questions.yaml").read_text())
+    cases = yaml.safe_load((ROOT / "evals" / "questions.yaml").read_text(encoding="utf-8"))
     if len(sys.argv) > 1:
         cases = [c for c in cases if c["id"] in sys.argv[1:]]
     db = Database()
@@ -111,7 +111,7 @@ def main() -> None:
             lines.append(f"**Trampa que evalúa:** {r['trap']}\n")
         lines.extend(f"- {c}" for c in r["checks"])
         lines.append(f"\n**Respuesta del agente:**\n\n{r['answer']}\n")
-    (ROOT / "evals" / "results.md").write_text("\n".join(lines))
+    (ROOT / "evals" / "results.md").write_text("\n".join(lines), encoding="utf-8")
 
 
 if __name__ == "__main__":

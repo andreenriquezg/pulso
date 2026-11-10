@@ -208,7 +208,7 @@ def build(out: Path, seed: int = SEED) -> Path:
         con.register("_df", df)
         con.execute(f"CREATE TABLE {name} AS SELECT * FROM _df")
         con.unregister("_df")
-    views_sql = (Path(__file__).resolve().parents[1] / "semantic" / "views.sql").read_text()
+    views_sql = (Path(__file__).resolve().parents[1] / "semantic" / "views.sql").read_text(encoding="utf-8")
     con.execute(views_sql)
     con.close()
     return out
