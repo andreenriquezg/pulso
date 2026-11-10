@@ -29,8 +29,9 @@ flowchart LR
     G -->|SELECT seguro + LIMIT| D[(DuckDB<br/>solo lectura)]
     D -->|error de SQL| A
     D -->|resultado| A
-    A -->|make_chart| C[Gráfica Plotly]
+    A -->|make_chart| C[Gráfica validada]
     A --> R[Respuesta + supuestos<br/>+ SQL auditable]
+    A -. cada paso en vivo .-> W[Interfaz web<br/>streaming NDJSON]
 ```
 
 ### Cómo funciona
@@ -44,6 +45,16 @@ flowchart LR
 4. **Autocorrección.** Si DuckDB devuelve un error (columna mal escrita, tipo incorrecto), el error regresa al modelo como `tool_result` y este corrige la consulta. La interfaz muestra la corrección en lugar de esconderla.
 5. **Transparencia.** Cada respuesta incluye el panel *"Cómo llegué a esto"* con cada consulta, su propósito, el SQL ejecutado, los datos, las filas y la latencia, además de los tokens usados.
 
+### La interfaz
+
+`web/` es un frontend propio, sin framework ni build, servido por `pulso/server.py` (solo biblioteca estándar). El servidor transmite cada evento del agente como NDJSON, así que la interfaz dibuja cada consulta, error y gráfica en el momento en que ocurre.
+
+- **Un electrocardiograma del negocio.** El monitor de la barra superior late tranquilo en reposo, se acelera mientras el agente consulta, cambia a ámbar cuando se autocorrige y a verde cuando la respuesta está lista.
+- **Bitácora, no chat.** Cada pregunta es una entrada numerada con su rastro de investigación, que se pliega al terminar para dejar al frente la respuesta.
+- **Gráficas propias en SVG.** Se revelan con un barrido como el del monitor, marcan el máximo de la serie y tienen cursor con tooltip y leyenda que filtra series.
+- **Signos vitales** (MRR, NRR, churn, CAC) calculados al cargar desde las mismas vistas gobernadas, con la regla de nunca promediar tasas entre países.
+- Respeta `prefers-reduced-motion`.
+
 ## Calidad: cómo sé que responde bien
 
 | Capa | Qué verifica | Cómo correrlo |
@@ -51,6 +62,7 @@ flowchart LR
 | **Tests de la capa semántica** | Que el puente de MRR cuadre en cada mes y país; que el MRR de las vistas coincida con las suscripciones raw; que el conteo de clientes ruede bien; que GRR nunca supere al NRR ni el 100%; que el gasto de marketing reconcilie. | `pytest` |
 | **Tests de guardrails** | 13 intentos de ataque (`DROP`, `DELETE`, `COPY`, `ATTACH`, `read_csv`, múltiples sentencias, tablas no permitidas…) deben ser bloqueados. | `pytest` |
 | **Tests del loop del agente** | Con un cliente simulado (sin API): autocorrección ante error, bloqueo de escrituras, memoria para preguntas de seguimiento y caché del prompt. | `pytest` |
+| **Tests del servidor web** | Que los signos vitales usen la agregación gobernada, que el stream emita cada paso en orden y que no se puedan leer archivos fuera de `web/`. | `pytest` |
 | **Evals con preguntas de negocio** | 11 preguntas con respuesta conocida, varias diseñadas como **trampas** de analytics clásicas: promediar tasas entre países, NRR sin ponderar o CAC blended sin orgánicos. | `python evals/run_evals.py` |
 
 Los tests corren sin API key. Las evals usan el modelo real y escriben el detalle en `evals/results.md`.
@@ -75,10 +87,10 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 python data/generate.py               # crea data/pulso.duckdb (~3 s)
-pytest                                # 23 tests, sin API key
+pytest                                # 27 tests, sin API key
 
 export ANTHROPIC_API_KEY=sk-ant-...
-streamlit run app.py                  # interfaz de chat
+python -m pulso.server                # interfaz web en http://localhost:8000
 python -m pulso.cli "¿Cuál es el NRR por país?"   # o desde la terminal
 python evals/run_evals.py             # scorecard contra el set dorado
 ```
@@ -89,13 +101,14 @@ El modelo se configura con `PULSO_MODEL` (por defecto `claude-sonnet-5-5`).
 
 ```
 pulso/
-├── app.py                 # interfaz Streamlit
 ├── pulso/
 │   ├── agent.py           # loop de tool use, eventos, memoria de conversación
 │   ├── db.py              # guardrails (sqlglot) + ejecución DuckDB solo lectura
 │   ├── prompts.py         # system prompt y definición de herramientas
-│   ├── charts.py          # spec de gráfica validada → Plotly
+│   ├── charts.py          # spec de gráfica validada contra el resultado
+│   ├── server.py          # servidor web + stream NDJSON de eventos
 │   └── cli.py             # interfaz de terminal
+├── web/                   # interfaz: HTML, CSS y JS sin framework
 ├── semantic/
 │   ├── metrics.yaml       # definiciones de negocio (fuente única de verdad)
 │   └── views.sql          # vistas gobernadas de métricas

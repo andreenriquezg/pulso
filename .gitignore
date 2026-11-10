@@ -6,4 +6,3 @@ data/*.duckdb
 data/*.duckdb.wal
 evals/results.md
 .pytest_cache/
-.streamlit/secrets.toml

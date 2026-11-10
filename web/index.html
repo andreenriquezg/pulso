@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pulso · Analítica gobernada</title>
+  <meta name="description" content="Agente de analytics que responde preguntas de negocio SaaS con SQL auditable.">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="band" id="band">
+    <div class="brand">
+      <h1 class="wordmark">Pulso<span>.</span></h1>
+      <p class="brand-sub">Analítica gobernada · LatAm</p>
+    </div>
+
+    <div class="monitor" aria-hidden="true">
+      <canvas id="ecg"></canvas>
+    </div>
+
+    <div class="readout" aria-live="polite">
+      <div class="readout-state"><i class="led"></i><span id="state">En reposo</span></div>
+      <div class="readout-clock" id="clock">00:00.0</div>
+      <button class="ghost" id="reset" type="button" title="Empezar una conversación nueva">Nueva sesión</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="rail" id="rail">
+      <section class="block">
+        <h2 class="eyebrow"><span>Signos vitales</span><span id="asof" class="eyebrow-meta"></span></h2>
+        <ol class="vitals" id="vitals"></ol>
+      </section>
+
+      <section class="block">
+        <h2 class="eyebrow"><span>MRR por país</span><span id="customers" class="eyebrow-meta"></span></h2>
+        <div class="mix" id="mix"></div>
+        <ol class="mix-legend" id="mix-legend"></ol>
+      </section>
+
+      <section class="block">
+        <h2 class="eyebrow"><span>Líneas de investigación</span></h2>
+        <div id="prompts" class="prompts"></div>
+      </section>
+
+      <footer class="rail-foot">
+        <span id="model"></span>
+        <span>DuckDB · solo lectura</span>
+      </footer>
+    </aside>
+
+    <main class="log" id="log">
+      <section class="empty" id="empty">
+        <p class="kicker">Bitácora de investigación · <span id="today"></span></p>
+        <h2 class="headline">Pregúntale <em>al negocio.</em></h2>
+        <p class="lede">
+          Escribe en español lo que quieres saber. El agente consulta la capa semántica,
+          escribe el SQL, se corrige si falla y te enseña exactamente cómo llegó a cada cifra.
+        </p>
+        <ul class="tenets">
+          <li><b>Métricas gobernadas</b><span>MRR, NRR, churn y CAC definidos una sola vez.</span></li>
+          <li><b>Solo lectura</b><span>Validación con sqlglot, DuckDB sin escritura y timeout.</span></li>
+          <li><b>Auditable</b><span>Cada número trae su consulta y sus datos.</span></li>
+        </ul>
+        <p class="nokey" id="nokey" hidden>
+          Falta <code>ANTHROPIC_API_KEY</code> en la terminal donde corre el servidor.
+        </p>
+      </section>
+
+      <ol class="entries" id="entries"></ol>
+
+      <form class="composer" id="composer" autocomplete="off">
+        <label class="sr-only" for="q">Pregunta</label>
+        <div class="composer-box">
+          <span class="prompt-mark" aria-hidden="true">›</span>
+          <textarea id="q" rows="1" placeholder="¿Cuál fue el churn de México en el último trimestre?" spellcheck="false"></textarea>
+          <button class="send" id="send" type="submit">
+            <span class="send-label">Preguntar</span>
+            <kbd>↵</kbd>
+          </button>
+        </div>
+        <p class="composer-hint"><kbd>/</kbd> para escribir · <kbd>⇧ ↵</kbd> salto de línea</p>
+      </form>
+    </main>
+  </div>
+
+  <script src="/static/app.js" type="module"></script>
+</body>
+</html>
