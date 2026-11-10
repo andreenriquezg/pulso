@@ -24,7 +24,7 @@ const s = (tag, attrs = {}) => {
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 const EASE_IN_OUT = "cubic-bezier(0.77, 0, 0.175, 1)";
-const PALETTE = ["#17150F", "#E5462B", "#1E6B65", "#C2800F", "#4C6A92", "#8C4B73", "#7C8B4A", "#A39D8C"];
+const PALETTE = ["#1F3D74", "#C2800F", "#17150F", "#1E6B65", "#8C4B73", "#6F8FBF", "#7C8B4A", "#A39D8C"];
 
 // ------------------------------------------------------------------ format
 const nf0 = new Intl.NumberFormat("es-MX", { maximumFractionDigits: 0 });
@@ -78,10 +78,10 @@ const ecg = (() => {
   const canvas = $("#ecg");
   const ctx = canvas.getContext("2d");
   let W = 0, H = 0, dpr = 1, ys = [], cs = [], x = 0, last = performance.now();
-  let t = 0, nextBeat = 0.4, beatStart = -10, beatAmp = 0.6, beatColor = "#E5462B";
-  const mode = { bpm: 58, amp: 0.55, speed: 95, color: "#E5462B" };
+  let t = 0, nextBeat = 0.4, beatStart = -10, beatAmp = 0.6, beatColor = "#1F3D74";
+  const mode = { bpm: 58, amp: 0.55, speed: 95, color: "#1F3D74" };
   const queued = [];
-  const COLORS = { signal: "#E5462B", amber: "#C2800F", teal: "#1E6B65", ink: "#17150F" };
+  const COLORS = { signal: "#1F3D74", amber: "#C2800F", teal: "#1E6B65", ink: "#17150F" };
 
   function resize() {
     const r = canvas.getBoundingClientRect();
@@ -655,8 +655,8 @@ function drawSVG(model, spec, W, hidden, animate, plot) {
           const [pk, pv] = pts.reduce((a, b) => (b[1] > a[1] ? b : a));
           if (pk !== pts[pts.length - 1][0]) {
             const cx = X(pk), cy = Y(pv);
-            g.append(s("circle", { cx, cy, r: 9, fill: "rgba(229,70,43,.14)" }), s("circle", { cx, cy, r: 4, fill: "#E5462B", stroke: "#F8F5EE", "stroke-width": 2 }));
-            const lbl = s("text", { x: cx, y: cy - 16, "text-anchor": "middle", style: "font:500 11.5px var(--f-mono);fill:#B8321B" });
+            g.append(s("circle", { cx, cy, r: 9, fill: "rgba(31, 61, 116,.14)" }), s("circle", { cx, cy, r: 4, fill: "#1F3D74", stroke: "#F8F5EE", "stroke-width": 2 }));
+            const lbl = s("text", { x: cx, y: cy - 16, "text-anchor": "middle", style: "font:500 11.5px var(--f-mono);fill:#162D57" });
             lbl.textContent = `máx ${fmtAxis(pv)}${model.dated ? " · " + monthLabel(model.xs[pk]) : ""}`;
             g.append(lbl);
           }
@@ -673,7 +673,7 @@ function drawSVG(model, spec, W, hidden, animate, plot) {
     });
     if (animate) {
       // sweep reveal, like the monitor's write head
-      const head = s("line", { x1: M.l, x2: M.l, y1: M.t, y2: M.t + ih, stroke: "#E5462B", "stroke-width": 1.5 });
+      const head = s("line", { x1: M.l, x2: M.l, y1: M.t, y2: M.t + ih, stroke: "#1F3D74", "stroke-width": 1.5 });
       svg.append(head);
       anims.push(() => {
         body.animate([{ clipPath: `inset(0 ${W - M.l + 2}px 0 0)` }, { clipPath: "inset(0 -80px 0 0)" }], { duration: 1300, easing: EASE_IN_OUT, fill: "both" });
