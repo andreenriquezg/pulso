@@ -1,0 +1,147 @@
+# =============================================================================
+# Pulso semantic layer
+# Single source of truth for what each table means and how each metric is
+# defined. It is injected into the agent's system prompt, so changing a
+# definition here changes how every question is answered.
+# =============================================================================
+
+business_context: >
+  SaaS de contabilidad y facturación electrónica en la nube para PyMEs de
+  LatAm. Suscripción mensual por plan. Montos en USD. Datos de nov-2024 a
+  oct-2026 (el último mes completo es 2026-10). Columnas `month` siempre son
+  el primer día del mes (DATE).
+
+dimensions:
+  country:
+    values: {MX: México, CO: Colombia, PE: Perú, CR: Costa Rica, DO: República Dominicana}
+  acquisition_channel:
+    values:
+      paid_search: Google/Bing ads
+      paid_social: Meta/TikTok ads
+      contadores: programa de partners contadores (comisión por alta)
+      organico: SEO / directo, sin costo de adquisición
+      referidos: crédito por referido
+  plan_id:
+    values: {EMP: Emprendedor 15 USD, PYM: Pyme 35 USD, PLU: Plus 65 USD, PRO: Pro 120 USD}
+    note: >
+      En Perú, EMP y PYM subieron 20% de precio a partir de 2026-04.
+  employees_band: ["1-5", "6-20", "21-50", "51+"]
+  industry: [comercio, servicios, restaurantes, construccion, salud, manufactura, tecnologia]
+
+tables:
+  # ---------------------------- raw -----------------------------------------
+  customers:
+    kind: raw
+    grain: un cliente
+    columns: [customer_id, country, industry, employees_band, acquisition_channel, signup_date]
+  plans:
+    kind: raw
+    grain: un plan
+    columns: [plan_id, plan_name, list_price_usd]
+  countries:
+    kind: raw
+    columns: [country, country_name]
+  subscription_months:
+    kind: raw
+    grain: cliente x mes con suscripción activa (si no hay fila, no pagó ese mes)
+    columns: [customer_id, month, plan_id, mrr_usd]
+  product_usage:
+    kind: raw
+    grain: cliente x mes activo
+    columns: [customer_id, month, invoices_issued]
+  marketing_spend:
+    kind: raw
+    grain: mes x país x canal pagado
+    columns: [month, country, channel, spend_usd]
+
+  # ---------------------------- governed views ------------------------------
+  mrr_movements:
+    kind: view
+    grain: cliente x mes
+    columns: [customer_id, month, country, acquisition_channel, prev_plan_id, plan_id,
+              prev_mrr_usd, mrr_usd, mrr_change_usd, movement]
+    note: >
+      movement ∈ {new, expansion, contraction, churn, reactivation, retained}.
+      Una fila 'churn' aparece en el primer mes SIN pago (mrr_usd = 0).
+  monthly_kpis:
+    kind: view
+    grain: mes x país
+    columns: [month, country, mrr_start_usd, mrr_end_usd, new_mrr_usd, expansion_mrr_usd,
+              contraction_mrr_usd, churned_mrr_usd, reactivation_mrr_usd, customers_start,
+              customers_end, new_customers, churned_customers, reactivated_customers,
+              net_new_mrr_usd, arr_end_usd, arpa_usd, logo_churn_rate,
+              gross_mrr_churn_rate, net_mrr_churn_rate]
+    note: >
+      contraction_mrr_usd y churned_mrr_usd son POSITIVOS. Puente:
+      start + new + expansion - contraction - churned + reactivation = end.
+  nrr_12m:
+    kind: view
+    grain: mes x país (solo meses con 12 meses de historia, desde 2025-11)
+    columns: [month, country, base_customers, base_mrr_usd, retained_mrr_usd,
+              retained_mrr_capped_usd, retained_customers, nrr, grr]
+  acquisition:
+    kind: view
+    grain: mes x país x canal
+    columns: [month, country, channel, is_paid_channel, new_customers, spend_usd, cac_usd]
+  customer_status:
+    kind: view
+    grain: un cliente
+    columns: [customer_id, country, industry, employees_band, acquisition_channel, signup_date,
+              first_month, last_active_month, is_active, first_plan_id, last_plan_id,
+              last_mrr_usd, active_months, lifetime_revenue_usd, avg_invoices_last_3m]
+    note: is_active = pagó en el último mes de datos (2026-10).
+
+metrics:
+  mrr:
+    definition: Suma de mrr_usd de clientes activos en el mes.
+    source: monthly_kpis.mrr_end_usd
+  arr:
+    definition: 12 x MRR.
+    source: monthly_kpis.arr_end_usd
+  net_new_mrr:
+    definition: new + expansion - contraction - churned + reactivation.
+    source: monthly_kpis.net_new_mrr_usd
+  arpa:
+    definition: MRR / clientes activos al cierre del mes.
+    source: monthly_kpis.arpa_usd
+  logo_churn_rate:
+    definition: Clientes que dejaron de pagar en el mes / clientes activos al inicio del mes.
+    source: monthly_kpis.logo_churn_rate
+    aggregation: SUM(churned_customers) / SUM(customers_start)
+  gross_mrr_churn_rate:
+    definition: (churned_mrr + contraction_mrr) / mrr_start.
+    aggregation: (SUM(churned_mrr_usd) + SUM(contraction_mrr_usd)) / SUM(mrr_start_usd)
+  net_mrr_churn_rate:
+    definition: (churned_mrr + contraction_mrr - expansion_mrr) / mrr_start. Negativo = expansión neta.
+  nrr:
+    definition: >
+      Net Revenue Retention a 12 meses: MRR actual de los clientes que pagaban
+      hace 12 meses / su MRR de hace 12 meses. Incluye expansión, contracción y churn.
+    source: nrr_12m.nrr
+    aggregation: SUM(retained_mrr_usd) / SUM(base_mrr_usd)
+  grr:
+    definition: Como NRR pero sin expansión (cada cliente topado a su MRR inicial). Máximo 100%.
+    source: nrr_12m.grr
+    aggregation: SUM(retained_mrr_capped_usd) / SUM(base_mrr_usd)
+  cac:
+    definition: Gasto de marketing / clientes nuevos, por canal pagado.
+    source: acquisition.cac_usd
+    aggregation: SUM(spend_usd) / SUM(new_customers) con is_paid_channel
+  blended_cac:
+    definition: Gasto total / TODOS los clientes nuevos (incluye orgánico).
+    aggregation: SUM(spend_usd) / SUM(new_customers) sin filtrar canal
+  ltv:
+    definition: >
+      ARPA / logo_churn_rate mensual (vida esperada en meses x ingreso mensual).
+      Usar churn promedio de los últimos 6 meses para estabilidad. Sin margen bruto.
+  ltv_to_cac:
+    definition: LTV / CAC del mismo segmento y periodo. Referencia sana >= 3.
+  payback_months:
+    definition: CAC / ARPA de clientes nuevos.
+
+rules:
+  - Usa las vistas gobernadas (monthly_kpis, nrr_12m, acquisition, customer_status, mrr_movements) antes que recalcular desde tablas raw.
+  - Nunca promedies tasas entre países o meses; suma los componentes y recalcula.
+  - '"Último mes" o "este mes" = 2026-10. "Último trimestre" = 2026-08 a 2026-10 salvo que se diga otra cosa.'
+  - Si una pregunta es ambigua, elige la definición estándar de arriba y dilo explícitamente.
+  - Reporta montos en USD redondeados y tasas en porcentaje con 1 decimal.

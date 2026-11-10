@@ -1,0 +1,9 @@
+anthropic>=0.40
+duckdb>=1.1
+sqlglot>=25.0
+pandas>=2.0
+numpy>=1.26
+plotly>=5.20
+streamlit>=1.40
+pyyaml>=6.0
+pytest>=8.0
